@@ -1,7 +1,7 @@
 use actix_web::http::header::ContentType;
 use actix_web::middleware::Logger;
 use actix_web::web::Path;
-use actix_web::{get, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use chrono::DateTime;
 use itertools::Itertools;
 use reqwest::header::AUTHORIZATION;
@@ -41,13 +41,17 @@ struct CCTrayProjectInfo {
     web_url: String,
 }
 
+struct AppState {
+    client: reqwest::Client,
+}
+
 #[get("/")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
 #[get("/cctray/{org}/{project}")]
-async fn cctray(req: HttpRequest, info: Path<ProjectInfo>) -> impl Responder {
+async fn cctray(req: HttpRequest, info: Path<ProjectInfo>, data: web::Data<AppState>) -> impl Responder {
     let maybe_auth_header = req.headers().get("authorization");
 
     if None == maybe_auth_header {
@@ -58,8 +62,8 @@ async fn cctray(req: HttpRequest, info: Path<ProjectInfo>) -> impl Responder {
         "https://{}.semaphoreci.com/api/v1alpha/pipelines?project_id={}",
         info.org, info.project
     );
-    let client = reqwest::Client::new();
-    let result = client
+
+    let result = data.client
         .get(url)
         .header(
             AUTHORIZATION,
@@ -161,8 +165,12 @@ fn to_project_xml_fragment(info: CCTrayProjectInfo) -> String {
 async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
+
     HttpServer::new(|| {
+        let client = reqwest::Client::new();
+
         App::new()
+            .app_data(web::Data::new(AppState { client }))
             .wrap(Logger::default())
             .service(hello)
             .service(cctray)
