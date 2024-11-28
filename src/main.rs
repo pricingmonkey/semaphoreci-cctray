@@ -127,14 +127,15 @@ fn get_cctray_project_info(
     } else {
         "Sleeping"
     };
-    let last_build_status = last_completed_pipeline.map_or_else(
-        || "Unknown",
-        |p| match p.result.clone().unwrap_or(String::from("")).to_uppercase().as_str() {
-            "PASSED" => "Success",
-            "FAILED" => "Failure",
-            _ => "Unknown",
-        },
-    );
+    let last_build_status = last_completed_pipeline
+        .and_then(|p| p.result.clone())
+        .and_then(|result| match result.to_uppercase().as_str() {
+            "PASSED" => Some("Success"),
+            "FAILED" => Some("Failure"),
+            _ => None,
+        })
+        .unwrap_or("Unknown");
+
     let last_build_label = last_completed_pipeline.map_or_else(|| "", |p| &p.ppl_id);
     let last_build_time = last_completed_pipeline
         .and_then(|p| DateTime::from_timestamp(p.done_at.seconds, 0))
