@@ -5,6 +5,7 @@ use actix_web::{get, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use chrono::DateTime;
 use itertools::Itertools;
 use reqwest::header::AUTHORIZATION;
+use reqwest::StatusCode;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -23,7 +24,7 @@ struct PipelinesListEntity {
     // DONE | RUNNING
     state: String,
     // PASSED | FAILED
-    result: String,
+    result: Option<String>,
     name: String,
     created_at: Timestamp,
     done_at: Timestamp,
@@ -47,6 +48,12 @@ async fn hello() -> impl Responder {
 
 #[get("/cctray/{org}/{project}")]
 async fn cctray(req: HttpRequest, info: Path<ProjectInfo>) -> impl Responder {
+    let maybe_auth_header = req.headers().get("authorization");
+
+    if None == maybe_auth_header {
+        return HttpResponse::Unauthorized().body("Unauthorized!");
+    }
+
     let url = format!(
         "https://{}.semaphoreci.com/api/v1alpha/pipelines?project_id={}",
         info.org, info.project
@@ -56,8 +63,7 @@ async fn cctray(req: HttpRequest, info: Path<ProjectInfo>) -> impl Responder {
         .get(url)
         .header(
             AUTHORIZATION,
-            req.headers()
-                .get("authorization")
+            maybe_auth_header
                 .unwrap()
                 .to_str()
                 .unwrap()
@@ -66,6 +72,15 @@ async fn cctray(req: HttpRequest, info: Path<ProjectInfo>) -> impl Responder {
         .send()
         .await
         .unwrap();
+
+    if result.status() != StatusCode::OK {
+        return match result.status() {
+            StatusCode::NOT_FOUND => HttpResponse::NotFound().finish(),
+            StatusCode::FORBIDDEN => HttpResponse::Forbidden().finish(),
+            StatusCode::UNAUTHORIZED => HttpResponse::Unauthorized().finish(),
+            _ => HttpResponse::InternalServerError().finish(),
+        }
+    }
 
     let pipelines = result.json::<Vec<PipelinesListEntity>>().await.unwrap();
 
@@ -92,6 +107,7 @@ fn get_cctray_project_info(
     let sorted_pipelines: Vec<&&PipelinesListEntity> = pipelines
         .iter()
         .sorted_by_key(|p| p.created_at.seconds)
+        .rev()
         .collect();
 
     let latest_pipeline = sorted_pipelines.get(0).unwrap();
@@ -109,7 +125,7 @@ fn get_cctray_project_info(
     };
     let last_build_status = last_completed_pipeline.map_or_else(
         || "Unknown",
-        |p| match p.result.to_uppercase().as_str() {
+        |p| match p.result.clone().unwrap_or(String::from("")).to_uppercase().as_str() {
             "PASSED" => "Success",
             "FAILED" => "Failure",
             _ => "Unknown",
