@@ -1,7 +1,7 @@
 use actix_web::http::header::ContentType;
+use actix_web::middleware::Logger;
 use actix_web::web::Path;
 use actix_web::{get, App, HttpRequest, HttpResponse, HttpServer, Responder};
-use actix_web::middleware::Logger;
 use chrono::DateTime;
 use itertools::Itertools;
 use reqwest::header::AUTHORIZATION;
@@ -16,7 +16,6 @@ struct ProjectInfo {
 #[derive(Deserialize)]
 struct Timestamp {
     seconds: i64,
-    nanos: u32,
 }
 
 #[derive(Deserialize)]
@@ -32,6 +31,15 @@ struct PipelinesListEntity {
     wf_id: String,
 }
 
+struct CCTrayProjectInfo {
+    name: String,
+    activity: String,
+    last_build_status: String,
+    last_build_label: String,
+    last_build_time: String,
+    web_url: String,
+}
+
 #[get("/")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
@@ -39,8 +47,6 @@ async fn hello() -> impl Responder {
 
 #[get("/cctray/{org}/{project}")]
 async fn cctray(req: HttpRequest, info: Path<ProjectInfo>) -> impl Responder {
-    println!("request from {}", req.peer_addr().unwrap());
-
     let url = format!(
         "https://{}.semaphoreci.com/api/v1alpha/pipelines?project_id={}",
         info.org, info.project
@@ -50,7 +56,6 @@ async fn cctray(req: HttpRequest, info: Path<ProjectInfo>) -> impl Responder {
         .get(url)
         .header(
             AUTHORIZATION,
-
             req.headers()
                 .get("authorization")
                 .unwrap()
@@ -68,7 +73,10 @@ async fn cctray(req: HttpRequest, info: Path<ProjectInfo>) -> impl Responder {
         .iter()
         .into_group_map_by(|p| p.name.clone())
         .iter()
-        .map(|(name, pipelines)| get_project_xml(name, pipelines, &info.org))
+        .map(|(name, pipelines)| get_cctray_project_info(name, pipelines, &info.org))
+        .sorted_by_key(|i| i.last_build_time.clone())
+        .rev()
+        .map(to_project_xml_fragment)
         .join("\n");
 
     HttpResponse::Ok()
@@ -76,7 +84,11 @@ async fn cctray(req: HttpRequest, info: Path<ProjectInfo>) -> impl Responder {
         .body(format!("<Projects>{}</Projects>", projects))
 }
 
-fn get_project_xml(name: &String, pipelines: &Vec<&PipelinesListEntity>, org: &String) -> String {
+fn get_cctray_project_info(
+    name: &String,
+    pipelines: &Vec<&PipelinesListEntity>,
+    org: &String,
+) -> CCTrayProjectInfo {
     let sorted_pipelines: Vec<&&PipelinesListEntity> = pipelines
         .iter()
         .sorted_by_key(|p| p.created_at.seconds)
@@ -112,9 +124,20 @@ fn get_project_xml(name: &String, pipelines: &Vec<&PipelinesListEntity>, org: &S
         org, latest_pipeline.wf_id, latest_pipeline.ppl_id
     );
 
+    CCTrayProjectInfo {
+        name: name.clone(),
+        activity: activity.to_string(),
+        last_build_status: last_build_status.to_string(),
+        last_build_label: last_build_label.to_string(),
+        last_build_time,
+        web_url,
+    }
+}
+
+fn to_project_xml_fragment(info: CCTrayProjectInfo) -> String {
     format!(
         "<Project name=\"{}\" activity=\"{}\" lastBuildStatus=\"{}\" lastBuildLabel=\"{}\" lastBuildTime=\"{}\" webUrl=\"{}\"/>",
-        name, activity, last_build_status, last_build_label, last_build_time, web_url
+        info.name, info.activity, info.last_build_status, info.last_build_label, info.last_build_time, info.web_url
     )
 }
 
@@ -122,8 +145,13 @@ fn get_project_xml(name: &String, pipelines: &Vec<&PipelinesListEntity>, org: &S
 async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
-    HttpServer::new(|| App::new().wrap(Logger::default()).service(hello).service(cctray))
-        .bind(("127.0.0.1", 8080))?
-        .run()
-        .await
+    HttpServer::new(|| {
+        App::new()
+            .wrap(Logger::default())
+            .service(hello)
+            .service(cctray)
+    })
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await
 }
