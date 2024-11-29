@@ -1,7 +1,7 @@
 mod pipeline;
 
 use crate::pipeline::Pipeline;
-use actix_web::http::header::ContentType;
+use actix_web::http::header::{ContentType, HeaderMap};
 use actix_web::middleware::Logger;
 use actix_web::web::Path;
 use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
@@ -40,15 +40,15 @@ async fn cctray(
     info: Path<ProjectInfo>,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    let maybe_auth_header = req.headers().get("authorization");
+    let auth_token = get_token(req.headers());
 
-    if None == maybe_auth_header {
-        return HttpResponse::Unauthorized().body("Unauthorized!");
-    }
-
-    let auth_token: String = maybe_auth_header.unwrap().to_str().unwrap().into();
-    let pipelines =
-        pipeline::get_pipeline(&auth_token, &info.org, &info.project, &data.client).await;
+    let pipelines = match auth_token {
+        Ok(token) => pipeline::get_pipeline(&token, &info.org, &info.project, &data.client).await,
+        Err(e) => {
+            println!("{}", e);
+            Err("Unauthorized")
+        },
+    };
 
     match pipelines {
         Err("Not found") => HttpResponse::NotFound().finish(),
@@ -68,9 +68,21 @@ async fn cctray(
             HttpResponse::Ok()
                 .content_type(ContentType::xml())
                 .body(format!("<Projects>{}</Projects>", projects))
-        },
+        }
         _ => HttpResponse::InternalServerError().finish(),
     }
+}
+
+fn get_token(headers: &HeaderMap) -> Result<String, &'static str> {
+    headers
+        .get("authorization")
+        .ok_or("Authorization header missing")
+        .and_then(|auth_header| {
+            auth_header
+                .to_str()
+                .map_err(|_| "Authorization header is invalid")
+        })
+        .map(|auth_token| auth_token.replace("Bearer", "").trim().into())
 }
 
 fn get_cctray_project_info(

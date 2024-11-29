@@ -33,7 +33,7 @@ pub async fn get_pipeline(
 
     let result = client
         .get(url)
-        .header(AUTHORIZATION, auth_token.replace("Bearer", "Token"))
+        .header(AUTHORIZATION, format!("Token {}", auth_token))
         .send()
         .await
         .unwrap();
