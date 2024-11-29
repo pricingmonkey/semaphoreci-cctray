@@ -1,35 +1,19 @@
+mod pipeline;
+
+use crate::pipeline::Pipeline;
 use actix_web::http::header::ContentType;
 use actix_web::middleware::Logger;
 use actix_web::web::Path;
 use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use chrono::DateTime;
 use itertools::Itertools;
-use reqwest::header::AUTHORIZATION;
-use reqwest::StatusCode;
 use serde::Deserialize;
+use std::convert::Into;
 
 #[derive(Deserialize)]
 struct ProjectInfo {
     org: String,
     project: String,
-}
-
-#[derive(Deserialize)]
-struct Timestamp {
-    seconds: i64,
-}
-
-#[derive(Deserialize)]
-struct PipelinesListEntity {
-    // DONE | RUNNING
-    state: String,
-    // PASSED | FAILED
-    result: Option<String>,
-    name: String,
-    created_at: Timestamp,
-    done_at: Timestamp,
-    ppl_id: String,
-    wf_id: String,
 }
 
 struct CCTrayProjectInfo {
@@ -51,64 +35,50 @@ async fn hello() -> impl Responder {
 }
 
 #[get("/cctray/{org}/{project}")]
-async fn cctray(req: HttpRequest, info: Path<ProjectInfo>, data: web::Data<AppState>) -> impl Responder {
+async fn cctray(
+    req: HttpRequest,
+    info: Path<ProjectInfo>,
+    data: web::Data<AppState>,
+) -> impl Responder {
     let maybe_auth_header = req.headers().get("authorization");
 
     if None == maybe_auth_header {
         return HttpResponse::Unauthorized().body("Unauthorized!");
     }
 
-    let url = format!(
-        "https://{}.semaphoreci.com/api/v1alpha/pipelines?project_id={}",
-        info.org, info.project
-    );
+    let auth_token: String = maybe_auth_header.unwrap().to_str().unwrap().into();
+    let pipelines =
+        pipeline::get_pipeline(&auth_token, &info.org, &info.project, &data.client).await;
 
-    let result = data.client
-        .get(url)
-        .header(
-            AUTHORIZATION,
-            maybe_auth_header
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .replace("Bearer", "Token"),
-        )
-        .send()
-        .await
-        .unwrap();
+    match pipelines {
+        Err("Not found") => HttpResponse::NotFound().finish(),
+        Err("Forbidden") => HttpResponse::Forbidden().finish(),
+        Err("Unauthorized") => HttpResponse::Unauthorized().finish(),
+        Ok(pipelines) => {
+            let projects = pipelines
+                .iter()
+                .into_group_map_by(|p| p.name.clone())
+                .iter()
+                .map(|(name, pipelines)| get_cctray_project_info(name, pipelines, &info.org))
+                .sorted_by_key(|i| i.last_build_time.clone())
+                .rev()
+                .map(to_project_xml_fragment)
+                .join("\n");
 
-    if result.status() != StatusCode::OK {
-        return match result.status() {
-            StatusCode::NOT_FOUND => HttpResponse::NotFound().finish(),
-            StatusCode::FORBIDDEN => HttpResponse::Forbidden().finish(),
-            StatusCode::UNAUTHORIZED => HttpResponse::Unauthorized().finish(),
-            _ => HttpResponse::InternalServerError().finish(),
-        }
+            HttpResponse::Ok()
+                .content_type(ContentType::xml())
+                .body(format!("<Projects>{}</Projects>", projects))
+        },
+        _ => HttpResponse::InternalServerError().finish(),
     }
-
-    let pipelines = result.json::<Vec<PipelinesListEntity>>().await.unwrap();
-
-    let projects = pipelines
-        .iter()
-        .into_group_map_by(|p| p.name.clone())
-        .iter()
-        .map(|(name, pipelines)| get_cctray_project_info(name, pipelines, &info.org))
-        .sorted_by_key(|i| i.last_build_time.clone())
-        .rev()
-        .map(to_project_xml_fragment)
-        .join("\n");
-
-    HttpResponse::Ok()
-        .content_type(ContentType::xml())
-        .body(format!("<Projects>{}</Projects>", projects))
 }
 
 fn get_cctray_project_info(
     name: &String,
-    pipelines: &Vec<&PipelinesListEntity>,
+    pipelines: &Vec<&Pipeline>,
     org: &String,
 ) -> CCTrayProjectInfo {
-    let sorted_pipelines: Vec<&&PipelinesListEntity> = pipelines
+    let sorted_pipelines: Vec<&&Pipeline> = pipelines
         .iter()
         .sorted_by_key(|p| p.created_at.seconds)
         .rev()
@@ -165,7 +135,6 @@ fn to_project_xml_fragment(info: CCTrayProjectInfo) -> String {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
-
 
     HttpServer::new(|| {
         let client = reqwest::Client::new();
