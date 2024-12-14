@@ -9,6 +9,7 @@ use chrono::DateTime;
 use itertools::Itertools;
 use serde::Deserialize;
 use std::convert::Into;
+use std::env;
 
 #[derive(Deserialize)]
 struct ProjectInfo {
@@ -148,6 +149,9 @@ fn to_project_xml_fragment(info: CCTrayProjectInfo) -> String {
 async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
+    let port = env::var("PORT").ok().and_then(|port| port.parse::<u16>().ok()).unwrap_or(8080);
+    let bind_ip = env::var("BIND_IP").ok().unwrap_or(String::from("127.0.0.1"));
+
     HttpServer::new(|| {
         let client = reqwest::Client::new();
 
@@ -157,7 +161,7 @@ async fn main() -> std::io::Result<()> {
             .service(hello)
             .service(cctray)
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind((bind_ip, port))?
     .run()
     .await
 }
