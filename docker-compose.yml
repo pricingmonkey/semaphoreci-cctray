@@ -1,0 +1,22 @@
+services:
+  semaphoreci-cctray:
+    build: .
+    ports:
+      - "${PORT_SEMAPHORECI_CCTRAY:-8080}:8080"
+    environment:
+      - BIND_IP=0.0.0.0
+    networks:
+      - app-network
+
+  nevergreen:
+    image: buildcanariesteam/nevergreen:staging
+    ports:
+      - "${PORT_NEVERGREEN:-5000}:5000"
+    networks:
+      - app-network
+    depends_on:
+      - semaphoreci-cctray
+
+networks:
+  app-network:
+    driver: bridge
