@@ -21,14 +21,14 @@ pub struct Pipeline {
 }
 
 pub async fn get_pipeline(
-    auth_token: &String,
-    org: &String,
+    base_url: &String,
     project_id: &String,
+    auth_token: &String,
     client: &Client,
 ) -> Result<Vec<Pipeline>, &'static str> {
     let url = format!(
-        "https://{}.semaphoreci.com/api/v1alpha/pipelines?project_id={}",
-        org, project_id
+        "{}/api/v1alpha/pipelines?project_id={}",
+        base_url, project_id
     );
 
     let result = client
@@ -47,11 +47,13 @@ pub async fn get_pipeline(
         };
     }
 
-    result
-        .json::<Vec<Pipeline>>()
-        .await
-        .map_err(|e| {
+    result.text().await.map_err(|e| {
+        println!("Error: {}", e);
+        "Invalid response body"
+    }).and_then(|text| {
+        return serde_json::from_str(&text).map_err(|e| {
             println!("Error: {}", e);
             "Invalid JSON"
-        })
+        });
+    })
 }
