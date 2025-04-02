@@ -3,7 +3,7 @@ mod pipeline;
 use crate::pipeline::Pipeline;
 use actix_web::http::header::{ContentType, HeaderMap};
 use actix_web::web::Path;
-use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{route, web, HttpRequest, HttpResponse, Responder};
 use chrono::DateTime;
 use itertools::Itertools;
 use serde::Deserialize;
@@ -30,12 +30,12 @@ struct AppState {
     base_url: Option<String>,
 }
 
-#[get("/")]
+#[route("/", method = "GET", method = "HEAD")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
-#[get("/cctray/{org}/{project}")]
+#[route("/cctray/{org}/{project}", method = "GET", method = "HEAD")]
 async fn cctray(
     req: HttpRequest,
     info: Path<ProjectInfo>,
