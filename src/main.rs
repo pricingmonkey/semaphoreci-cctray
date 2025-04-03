@@ -1,5 +1,3 @@
-mod pipeline;
-
 use actix_web::{App, HttpServer};
 use semaphoreci_cctray::configure_app;
 use std::env;
