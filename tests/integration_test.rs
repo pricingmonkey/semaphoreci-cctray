@@ -57,3 +57,46 @@ async fn test_cctray_feed_with_head_request() {
     let body = res.text().await.unwrap();
     assert_eq!(body, "");
 }
+
+#[actix_web::test]
+async fn test_cctray_returns_401_when_token_missing() {
+    let mock_upstream = MockServer::start().await;
+
+    let addr = start_app::start_app(&mock_upstream.uri()).await;
+
+    let res = reqwest::Client::new()
+        .head(format!("http://{}/cctray/any-org/my-project", addr))
+        .send()
+        .await
+        .expect("failed to send request");
+
+    assert_eq!(res.status(), 401);
+    let body = res.text().await.unwrap();
+    assert_eq!(body, "");
+}
+
+#[actix_web::test]
+async fn test_cctray_returns_401_when_upstream_api_returned_401() {
+    let mock_upstream = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/api/v1alpha/pipelines"))
+        .and(query_param("project_id", "my-project"))
+        .and(header(AUTHORIZATION, "Token : my-token"))
+        .respond_with(ResponseTemplate::new(401).set_body_string("UNAUTHORIZED"))
+        .mount(&mock_upstream)
+        .await;
+
+    let addr = start_app::start_app(&mock_upstream.uri()).await;
+
+    let res = reqwest::Client::new()
+        .head(format!("http://{}/cctray/any-org/my-project", addr))
+        .header(AUTHORIZATION, "Bearer: my-token") // replace with your path
+        .send()
+        .await
+        .expect("failed to send request");
+
+    assert_eq!(res.status(), 401);
+    let body = res.text().await.unwrap();
+    assert_eq!(body, "");
+}

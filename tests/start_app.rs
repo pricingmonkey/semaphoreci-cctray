@@ -1,16 +1,15 @@
-use std::net::{SocketAddr, TcpListener};
 use actix_web::{App, HttpServer};
 use semaphoreci_cctray::configure_app;
+use std::net::{SocketAddr, TcpListener};
 
 pub async fn start_app(ci_base_uri: &String) -> SocketAddr {
-    std::env::set_var("CI_BASE_URL", ci_base_uri);
-
     // Bind to a random free port
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
+    let op = Some(ci_base_uri.clone());
 
-    let server = HttpServer::new(|| {
-        App::new().configure(configure_app) // your app factory
+    let server = HttpServer::new(move || {
+        App::new().configure(|cfg| configure_app(cfg, &op))
     })
         .listen(listener)
         .unwrap()

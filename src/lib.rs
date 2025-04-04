@@ -3,12 +3,11 @@ mod cctray;
 
 use actix_web::http::header::{ContentType, HeaderMap};
 use actix_web::web::Path;
-use actix_web::{route, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{error, route, web, HttpRequest, HttpResponse, Responder};
 use cctray::CCTrayProjectInfo;
 use itertools::Itertools;
 use serde::Deserialize;
 use std::convert::Into;
-use std::env;
 
 #[derive(Deserialize)]
 struct ProjectInfo {
@@ -31,42 +30,35 @@ async fn cctray_project(
     req: HttpRequest,
     info: Path<ProjectInfo>,
     data: web::Data<AppState>,
-) -> impl Responder {
+) -> actix_web::Result<HttpResponse> {
     let base_url = (&data.base_url)
         .clone()
         .unwrap_or(format!("https://{}.semaphoreci.com", info.org));
 
-    let auth_token = get_token(req.headers());
+    let auth_token = get_token(req.headers()).map_err(|e| error::ErrorUnauthorized(e))?;
 
-    let pipelines = match auth_token {
-        Ok(token) => pipeline::get_pipeline(&base_url, &info.project, &token, &data.client).await,
-        Err(e) => {
-            println!("{}", e);
-            Err("Unauthorized")
+    let pipelines = pipeline::get_pipeline(&base_url, &info.project, &auth_token, &data.client).await.map_err(|e| {
+        match e.status() {
+            Some(reqwest::StatusCode::UNAUTHORIZED) => error::ErrorUnauthorized(e),
+            Some(reqwest::StatusCode::NOT_FOUND) => error::ErrorNotFound(e),
+            _ => error::ErrorInternalServerError(e)
         }
-    };
+    })?;
 
-    match pipelines {
-        Err("Not found") => HttpResponse::NotFound().finish(),
-        Err("Forbidden") => HttpResponse::Forbidden().finish(),
-        Err("Unauthorized") => HttpResponse::Unauthorized().finish(),
-        Ok(pipelines) => {
-            let projects = pipelines
-                .iter()
-                .into_group_map_by(|p| p.name.clone())
-                .iter()
-                .map(|(name, pipelines)| cctray::get_cctray_project_info(name, pipelines, &info.org))
-                .sorted_by_key(|i| i.last_build_time.clone())
-                .rev()
-                .map(to_project_xml_fragment)
-                .join("\n");
+    let projects = pipelines
+        .iter()
+        .into_group_map_by(|p| p.name.clone())
+        .iter()
+        .map(|(name, pipelines)| cctray::get_cctray_project_info(name, pipelines, &info.org))
+        .sorted_by_key(|i| i.last_build_time.clone())
+        .rev()
+        .map(to_project_xml_fragment)
+        .join("\n");
 
-            HttpResponse::Ok()
-                .content_type(ContentType::xml())
-                .body(format!("<Projects>{}</Projects>", projects))
-        }
-        _ => HttpResponse::InternalServerError().finish(),
-    }
+    Ok(HttpResponse::Ok()
+        .content_type(ContentType::xml())
+        .body(format!("<Projects>{}</Projects>", projects))
+    )
 }
 
 fn get_token(headers: &HeaderMap) -> Result<String, &'static str> {
@@ -88,11 +80,10 @@ fn to_project_xml_fragment(info: CCTrayProjectInfo) -> String {
     )
 }
 
-pub fn configure_app(cfg: &mut web::ServiceConfig) {
+pub fn configure_app(cfg: &mut web::ServiceConfig, base_url: &Option<String>) {
     let client = reqwest::Client::new();
-    let base_url = env::var("CI_BASE_URL").ok();
 
-    cfg.app_data(web::Data::new(AppState { client, base_url }))
+    cfg.app_data(web::Data::new(AppState { client, base_url: base_url.clone() }))
         .service(hello)
         .service(cctray_project);
 }

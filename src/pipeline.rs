@@ -1,25 +1,25 @@
 use reqwest::header::AUTHORIZATION;
-use reqwest::{Client, StatusCode};
+use reqwest::Client;
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Timestamp {
     pub seconds: i64,
 }
 
-#[derive(Deserialize, Eq, PartialEq)]
+#[derive(Deserialize, Debug, Eq, PartialEq)]
 pub enum State {
     DONE,
     RUNNING
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub enum Result {
     PASSED,
     FAILED
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Pipeline {
     pub state: State,
     pub result: Option<Result>,
@@ -35,7 +35,7 @@ pub async fn get_pipeline(
     project_id: &String,
     auth_token: &String,
     client: &Client,
-) -> core::result::Result<Vec<Pipeline>, &'static str> {
+) -> core::result::Result<Vec<Pipeline>, reqwest::Error> {
     let url = format!(
         "{}/api/v1alpha/pipelines?project_id={}",
         base_url, project_id
@@ -46,24 +46,8 @@ pub async fn get_pipeline(
         .header(AUTHORIZATION, format!("Token {}", auth_token))
         .send()
         .await
-        .unwrap();
+        .unwrap()
+        .error_for_status()?;
 
-    if result.status() != StatusCode::OK {
-        return match result.status() {
-            StatusCode::NOT_FOUND => Err("Not found"),
-            StatusCode::FORBIDDEN => Err("Forbidden"),
-            StatusCode::UNAUTHORIZED => Err("Unauthorized"),
-            _ => Err("Internal server error"),
-        };
-    }
-
-    result.text().await.map_err(|e| {
-        println!("Error: {}", e);
-        "Invalid response body"
-    }).and_then(|text| {
-        return serde_json::from_str(&text).map_err(|e| {
-            println!("Error: {}", e);
-            "Invalid JSON"
-        });
-    })
+    result.json::<Vec<Pipeline>>().await
 }

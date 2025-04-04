@@ -14,8 +14,9 @@ async fn main() -> std::io::Result<()> {
     let bind_ip = env::var("BIND_IP")
         .ok()
         .unwrap_or(String::from("127.0.0.1"));
+    let ci_base_url = env::var("CI_BASE_URL").ok();
 
-    HttpServer::new(|| App::new().wrap(Logger::default()).configure(configure_app))
+    HttpServer::new(move || App::new().wrap(Logger::default()).configure(|cfg| configure_app(cfg, &ci_base_url)))
         .bind((bind_ip, port))?
         .run()
         .await
