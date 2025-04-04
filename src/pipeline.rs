@@ -7,12 +7,22 @@ pub struct Timestamp {
     pub seconds: i64,
 }
 
+#[derive(Deserialize, Eq, PartialEq)]
+pub enum State {
+    DONE,
+    RUNNING
+}
+
+#[derive(Deserialize, Clone)]
+pub enum Result {
+    PASSED,
+    FAILED
+}
+
 #[derive(Deserialize)]
 pub struct Pipeline {
-    // DONE | RUNNING
-    pub state: String,
-    // PASSED | FAILED
-    pub result: Option<String>,
+    pub state: State,
+    pub result: Option<Result>,
     pub name: String,
     pub created_at: Timestamp,
     pub done_at: Timestamp,
@@ -25,7 +35,7 @@ pub async fn get_pipeline(
     project_id: &String,
     auth_token: &String,
     client: &Client,
-) -> Result<Vec<Pipeline>, &'static str> {
+) -> core::result::Result<Vec<Pipeline>, &'static str> {
     let url = format!(
         "{}/api/v1alpha/pipelines?project_id={}",
         base_url, project_id
