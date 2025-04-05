@@ -3,7 +3,7 @@ mod semaphoreci;
 
 use actix_web::http::header::{ContentType, HeaderMap};
 use actix_web::web::Path;
-use actix_web::{error, route, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{error, route, routes, web, HttpRequest, HttpResponse, Responder};
 use cctray::CCTrayProjectInfo;
 use itertools::Itertools;
 use serde::Deserialize;
@@ -25,7 +25,11 @@ async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
-#[route("/cctray/{org}/{project}", method = "GET", method = "HEAD")]
+#[routes]
+#[get("/{org}/{project}/cctray")]
+#[head("/{org}/{project}/cctray")]
+#[get("/cctray/{org}/{project}")]
+#[head("/cctray/{org}/{project}")]
 async fn cctray_project(
     req: HttpRequest,
     info: Path<ProjectInfo>,
