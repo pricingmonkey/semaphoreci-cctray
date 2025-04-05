@@ -1,6 +1,23 @@
 use serde_json::{json, Value};
 
-pub fn pipeline_response_body() -> Value {
+pub fn projects_response_body() -> Value {
+  json!([
+    {
+      "metadata": {
+        "name": "my-project",
+        "id": "my-project-id",
+      }
+    },
+    {
+      "metadata": {
+        "name": "my-other-project",
+        "id": "my-other-project-id",
+      }
+    },
+  ])
+}
+
+pub fn pipelines_response_body() -> Value {
     json!([
       {
         "name": "build",

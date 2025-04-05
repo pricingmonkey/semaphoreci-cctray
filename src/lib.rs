@@ -1,5 +1,5 @@
-mod pipeline;
 mod cctray;
+mod semaphoreci;
 
 use actix_web::http::header::{ContentType, HeaderMap};
 use actix_web::web::Path;
@@ -37,13 +37,17 @@ async fn cctray_project(
 
     let auth_token = get_token(req.headers()).map_err(|e| error::ErrorUnauthorized(e))?;
 
-    let pipelines = pipeline::get_pipeline(&base_url, &info.project, &auth_token, &data.client).await.map_err(|e| {
-        match e.status() {
-            Some(reqwest::StatusCode::UNAUTHORIZED) => error::ErrorUnauthorized(e),
-            Some(reqwest::StatusCode::NOT_FOUND) => error::ErrorNotFound(e),
-            _ => error::ErrorInternalServerError(e)
-        }
-    })?;
+    let projects = semaphoreci::get_projects(&base_url, &auth_token, &data.client)
+        .await
+        .map_err(to_actix_error)?;
+
+    let project = projects.iter()
+        .find(|&p| p.metadata.name == info.project || p.metadata.id == info.project)
+        .ok_or_else(|| error::ErrorNotFound(format!("Project {} not found", info.project)))?;
+
+    let pipelines = semaphoreci::get_pipelines(&base_url, &project.metadata.id, &auth_token, &data.client)
+        .await
+        .map_err(to_actix_error)?;
 
     let projects = pipelines
         .iter()
@@ -57,8 +61,15 @@ async fn cctray_project(
 
     Ok(HttpResponse::Ok()
         .content_type(ContentType::xml())
-        .body(format!("<Projects>{}</Projects>", projects))
-    )
+        .body(format!("<Projects>{}</Projects>", projects)))
+}
+
+fn to_actix_error(e: reqwest::Error) -> actix_web::Error {
+    match e.status() {
+        Some(reqwest::StatusCode::UNAUTHORIZED) => error::ErrorUnauthorized(e),
+        Some(reqwest::StatusCode::NOT_FOUND) => error::ErrorNotFound(e),
+        _ => error::ErrorInternalServerError(e),
+    }
 }
 
 fn get_token(headers: &HeaderMap) -> Result<String, &'static str> {
@@ -83,7 +94,10 @@ fn to_project_xml_fragment(info: CCTrayProjectInfo) -> String {
 pub fn configure_app(cfg: &mut web::ServiceConfig, base_url: &Option<String>) {
     let client = reqwest::Client::new();
 
-    cfg.app_data(web::Data::new(AppState { client, base_url: base_url.clone() }))
+    cfg.app_data(web::Data::new(AppState {
+        client,
+        base_url: base_url.clone(),
+    }))
         .service(hello)
         .service(cctray_project);
 }

@@ -1,7 +1,7 @@
 use chrono::DateTime;
 use itertools::Itertools;
-use crate::pipeline;
-use crate::pipeline::{Pipeline, State};
+use crate::semaphoreci;
+use crate::semaphoreci::{Pipeline, State};
 
 pub enum Activity {
     Sleeping,
@@ -71,8 +71,8 @@ pub fn get_cctray_project_info(
         .and_then(|p| p.result.clone());
 
     let last_build_status = match last_pipeline_result{
-        Some(pipeline::Result::PASSED) => BuildStatus::Success,
-        Some(pipeline::Result::FAILED) => BuildStatus::Failure,
+        Some(semaphoreci::Result::PASSED) => BuildStatus::Success,
+        Some(semaphoreci::Result::FAILED) => BuildStatus::Failure,
         _ => BuildStatus::Unknown
     };
 
