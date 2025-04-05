@@ -1,9 +1,10 @@
+mod support;
+
 use reqwest::header::AUTHORIZATION;
 use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
-
-mod fixtures;
-mod start_app;
+use support::fixtures;
+use support::start_app::start_app;
 
 #[actix_web::test]
 async fn get_cctray_by_project_name() {
@@ -24,7 +25,7 @@ async fn get_cctray_by_project_name() {
         .mount(&mock_upstream)
         .await;
 
-    let addr = start_app::start_app(&mock_upstream.uri()).await;
+    let addr = start_app(&mock_upstream.uri()).await;
 
     let res = reqwest::Client::new()
         .get(format!("http://{}/cctray/any-org/my-project", addr))
@@ -58,7 +59,7 @@ async fn get_cctray_by_project_id() {
         .mount(&mock_upstream)
         .await;
 
-    let addr = start_app::start_app(&mock_upstream.uri()).await;
+    let addr = start_app(&mock_upstream.uri()).await;
 
     let res = reqwest::Client::new()
         .get(format!("http://{}/cctray/any-org/my-project-id", addr))
@@ -92,7 +93,7 @@ async fn get_cctray_head() {
         .mount(&mock_upstream)
         .await;
 
-    let addr = start_app::start_app(&mock_upstream.uri()).await;
+    let addr = start_app(&mock_upstream.uri()).await;
 
     let res = reqwest::Client::new()
         .head(format!("http://{}/cctray/any-org/my-project", addr))
@@ -110,7 +111,7 @@ async fn get_cctray_head() {
 async fn returns_401_when_token_missing() {
     let mock_upstream = MockServer::start().await;
 
-    let addr = start_app::start_app(&mock_upstream.uri()).await;
+    let addr = start_app(&mock_upstream.uri()).await;
 
     let res = reqwest::Client::new()
         .head(format!("http://{}/cctray/any-org/my-project", addr))
@@ -134,7 +135,7 @@ async fn returns_401_when_upstream_api_returned_401() {
         .mount(&mock_upstream)
         .await;
 
-    let addr = start_app::start_app(&mock_upstream.uri()).await;
+    let addr = start_app(&mock_upstream.uri()).await;
 
     let res = reqwest::Client::new()
         .head(format!("http://{}/cctray/any-org/my-project", addr))
