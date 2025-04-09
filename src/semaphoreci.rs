@@ -75,8 +75,7 @@ async fn get<T: DeserializeOwned>(
         .get(url)
         .header(AUTHORIZATION, format!("Token {}", auth_token))
         .send()
-        .await
-        .unwrap()
+        .await?
         .error_for_status()?;
 
     result.json::<T>().await
