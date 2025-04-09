@@ -72,7 +72,7 @@ fn to_actix_error(e: reqwest::Error) -> actix_web::Error {
     match e.status() {
         Some(reqwest::StatusCode::UNAUTHORIZED) => error::ErrorUnauthorized(e),
         Some(reqwest::StatusCode::NOT_FOUND) => error::ErrorNotFound(e),
-        _ => error::ErrorInternalServerError(e),
+        _ => error::ErrorBadGateway(e),
     }
 }
 
