@@ -5,6 +5,8 @@ services:
       - "${PORT_SEMAPHORECI_CCTRAY:-8080}:8080"
     environment:
       - BIND_IP=0.0.0.0
+      - RUST_LOG=INFO,actix_web::middleware::logger=DEBUG
+      - RUST_BACKTRACE=1
     networks:
       - app-network
 

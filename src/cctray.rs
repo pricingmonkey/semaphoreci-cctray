@@ -65,6 +65,7 @@ pub fn get_cctray_project_info(
     let activity = match latest_pipeline.state {
         State::RUNNING => Activity::Building,
         State::DONE => Activity::Sleeping,
+        _ => Activity::Sleeping,
     };
 
     let last_pipeline_result = last_completed_pipeline

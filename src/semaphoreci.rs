@@ -12,12 +12,16 @@ pub struct Timestamp {
 pub enum State {
     DONE,
     RUNNING,
+    #[serde(untagged)]
+    UNKNOWN(String)
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub enum Result {
     PASSED,
     FAILED,
+    #[serde(untagged)]
+    UNKNOWN(String)
 }
 
 #[derive(Deserialize, Debug)]
@@ -79,4 +83,24 @@ async fn get<T: DeserializeOwned>(
         .error_for_status()?;
 
     result.json::<T>().await
+}
+
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+    use serde_json;
+
+    #[test]
+    fn test_result_known_value_deserialised_as_enum() {
+        let result: Result = serde_json::from_str("\"PASSED\"").unwrap();
+        assert_eq!(result, Result::PASSED);
+    }
+
+    #[test]
+    fn test_result_unknown_value_deserialised_as_string() {
+        let result: Result = serde_json::from_str("\"BLAH\"").unwrap();
+        assert_eq!(result, Result::UNKNOWN("BLAH".to_string()));
+    }
+
 }
