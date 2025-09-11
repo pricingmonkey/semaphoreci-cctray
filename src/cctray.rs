@@ -1,8 +1,9 @@
-use chrono::DateTime;
-use itertools::Itertools;
 use crate::semaphoreci;
 use crate::semaphoreci::{Pipeline, State};
+use chrono::DateTime;
+use itertools::Itertools;
 
+#[derive(Debug, PartialEq)]
 pub enum Activity {
     Sleeping,
     Building,
@@ -20,6 +21,7 @@ impl Activity {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum BuildStatus {
     Success,
     Failure,
@@ -39,6 +41,7 @@ impl BuildStatus {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct CCTrayProjectInfo {
     pub name: String,
     pub activity: Activity,
