@@ -1,15 +1,9 @@
-FROM lukemathwalker/cargo-chef:0.1.77-rust-1.95.0-alpine3.23 AS chef
+FROM rust:1.95.0-alpine3.23 AS builder
+
 RUN apk --update add openssl-dev openssl-libs-static musl-dev pkgconfig
+
 WORKDIR /usr/src/semaphoreci-cctray
 
-FROM chef AS planner
-COPY src src
-COPY Cargo.lock Cargo.toml ./
-RUN cargo chef prepare --recipe-path recipe.json
-
-FROM chef AS builder
-COPY --from=planner /usr/src/semaphoreci-cctray/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
 COPY src src
 COPY Cargo.lock Cargo.toml ./
 RUN cargo build --release
