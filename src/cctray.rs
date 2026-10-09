@@ -16,7 +16,7 @@ impl Activity {
         match self {
             Activity::Sleeping => "Sleeping",
             Activity::Building => "Building",
-            Activity::CheckingModifications => "CheckingModifications"
+            Activity::CheckingModifications => "CheckingModifications",
         }
     }
 }
@@ -76,6 +76,11 @@ fn get_cctray_project_info(
 ) -> CCTrayProjectInfo {
     let sorted_pipelines: Vec<&&Pipeline> = pipelines
         .iter()
+        .filter(|p| {
+            p.state == State::RUNNING
+                || p.result == Some(semaphoreci::Result::PASSED)
+                || p.result == Some(semaphoreci::Result::FAILED)
+        })
         .sorted_by_key(|p| p.created_at.seconds)
         .rev()
         .collect();
@@ -89,13 +94,12 @@ fn get_cctray_project_info(
         _ => Activity::Sleeping,
     };
 
-    let last_pipeline_result = last_completed_pipeline
-        .and_then(|p| p.result.clone());
+    let last_pipeline_result = last_completed_pipeline.and_then(|p| p.result.clone());
 
-    let last_build_status = match last_pipeline_result{
+    let last_build_status = match last_pipeline_result {
         Some(semaphoreci::Result::PASSED) => BuildStatus::Success,
         Some(semaphoreci::Result::FAILED) => BuildStatus::Failure,
-        _ => BuildStatus::Unknown
+        _ => BuildStatus::Unknown,
     };
 
     let last_build_label = last_completed_pipeline.map_or_else(|| "", |p| &p.ppl_id);
@@ -138,20 +142,17 @@ fn serialize_project(info: &CCTrayProjectInfo) -> String {
 }
 
 pub fn serialize(cctray_projects: Vec<CCTrayProjectInfo>) -> String {
-    let xml_fragment = cctray_projects
-        .iter()
-        .map(serialize_project)
-        .join("\n");
+    let xml_fragment = cctray_projects.iter().map(serialize_project).join("\n");
 
     format!("<Projects>{}</Projects>", xml_fragment)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::cctray::{Activity, BuildStatus, CCTrayProjectInfo};
-    use crate::semaphoreci::Result::{FAILED, PASSED};
-    use crate::semaphoreci::{Pipeline, State, Timestamp};
     use crate::cctray::to_cctray_project_info;
+    use crate::cctray::{Activity, BuildStatus, CCTrayProjectInfo};
+    use crate::semaphoreci::Result::{FAILED, PASSED, UNKNOWN};
+    use crate::semaphoreci::{Pipeline, State, Timestamp};
 
     #[test]
     fn convert_sem_pipelines_to_cctray_projects() {
@@ -275,18 +276,57 @@ mod tests {
 
         assert_eq!(
             cctray_projects,
-            vec![
-                CCTrayProjectInfo {
-                    name: String::from("foo"),
-                    activity: Activity::Sleeping,
-                    last_build_status: BuildStatus::Success,
-                    last_build_label: String::from("ppl2"),
-                    last_build_time: String::from("1970-01-01T00:35:00+00:00"),
-                    web_url: String::from(
-                        "https://org-name.semaphoreci.com/workflows/wf2?pipeline_id=ppl2"
-                    ),
-                }
-            ]
+            vec![CCTrayProjectInfo {
+                name: String::from("foo"),
+                activity: Activity::Sleeping,
+                last_build_status: BuildStatus::Success,
+                last_build_label: String::from("ppl2"),
+                last_build_time: String::from("1970-01-01T00:35:00+00:00"),
+                web_url: String::from(
+                    "https://org-name.semaphoreci.com/workflows/wf2?pipeline_id=ppl2"
+                ),
+            }]
+        );
+    }
+
+    #[test]
+    fn ignores_cancelled_pipelines() {
+        let sem_pipelines = vec![
+            Pipeline {
+                name: String::from("build"),
+                state: State::DONE,
+                result: Some(UNKNOWN(String::from("CANCELED"))),
+                ppl_id: String::from("ppl2"),
+                wf_id: String::from("wf2"),
+                created_at: Timestamp { seconds: 2000 },
+                done_at: Timestamp { seconds: 2100 },
+            },
+            Pipeline {
+                name: String::from("build"),
+                state: State::DONE,
+                result: Some(PASSED),
+                ppl_id: String::from("ppl1"),
+                wf_id: String::from("wf1"),
+                created_at: Timestamp { seconds: 1000 },
+                done_at: Timestamp { seconds: 1100 },
+            },
+        ];
+
+        let org = String::from("org-name");
+        let cctray_projects = to_cctray_project_info(sem_pipelines, &org);
+
+        assert_eq!(
+            cctray_projects,
+            vec![CCTrayProjectInfo {
+                name: String::from("build"),
+                activity: Activity::Sleeping,
+                last_build_status: BuildStatus::Success,
+                last_build_label: String::from("ppl1"),
+                last_build_time: String::from("1970-01-01T00:18:20+00:00"),
+                web_url: String::from(
+                    "https://org-name.semaphoreci.com/workflows/wf1?pipeline_id=ppl1"
+                ),
+            }]
         );
     }
 }
