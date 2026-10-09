@@ -12,6 +12,8 @@ RUN cargo test --release
 FROM alpine:3.24 AS runtime
 COPY --from=builder /usr/src/semaphoreci-cctray/target/release/semaphoreci-cctray /usr/local/bin/semaphoreci-cctray
 
+RUN apk --no-cache upgrade zlib
+
 #HEALTHCHECK --start-period=1m CMD curl -f http://localhost:5001/ready || exit 1
 
 CMD [ "semaphoreci-cctray" ]
