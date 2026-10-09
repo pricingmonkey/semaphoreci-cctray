@@ -1,4 +1,4 @@
-FROM rust:1.95.0-alpine3.23 AS builder
+FROM rust:1.99-alpine3.24 AS builder
 
 RUN apk --update add openssl-dev openssl-libs-static musl-dev pkgconfig
 
@@ -9,7 +9,7 @@ COPY Cargo.lock Cargo.toml ./
 RUN cargo build --release
 RUN cargo test --release
 
-FROM alpine:3.23 AS runtime
+FROM alpine:3.24 AS runtime
 COPY --from=builder /usr/src/semaphoreci-cctray/target/release/semaphoreci-cctray /usr/local/bin/semaphoreci-cctray
 
 #HEALTHCHECK --start-period=1m CMD curl -f http://localhost:5001/ready || exit 1
