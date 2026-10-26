@@ -19,7 +19,7 @@ async fn get_cctray_by_project_name() {
 
     Mock::given(method("GET"))
         .and(path("/api/v1alpha/pipelines"))
-        .and(query_param("project_id", "my-project-id"))
+        .and(query_param("project_id", "id-prj-a"))
         .and(header(AUTHORIZATION, "Token : my-token"))
         .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::pipelines_response_body()))
         .mount(&mock_upstream)
@@ -28,7 +28,7 @@ async fn get_cctray_by_project_name() {
     let addr = start_app(&mock_upstream.uri()).await;
 
     let res = reqwest::Client::new()
-        .get(format!("http://{}/any-org/my-project/cctray", addr))
+        .get(format!("http://{}/any-org/project-a/cctray", addr))
         .header(AUTHORIZATION, "Bearer: my-token") // replace with your path
         .send()
         .await
@@ -53,7 +53,7 @@ async fn get_cctray_by_project_id() {
 
     Mock::given(method("GET"))
         .and(path("/api/v1alpha/pipelines"))
-        .and(query_param("project_id", "my-project-id"))
+        .and(query_param("project_id", "id-prj-a"))
         .and(header(AUTHORIZATION, "Token : my-token"))
         .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::pipelines_response_body()))
         .mount(&mock_upstream)
@@ -62,7 +62,7 @@ async fn get_cctray_by_project_id() {
     let addr = start_app(&mock_upstream.uri()).await;
 
     let res = reqwest::Client::new()
-        .get(format!("http://{}/any-org/my-project/cctray", addr))
+        .get(format!("http://{}/any-org/id-prj-a/cctray", addr))
         .header(AUTHORIZATION, "Bearer: my-token") // replace with your path
         .send()
         .await
@@ -87,7 +87,7 @@ async fn get_cctray_with_legacy_path() {
 
     Mock::given(method("GET"))
         .and(path("/api/v1alpha/pipelines"))
-        .and(query_param("project_id", "my-project-id"))
+        .and(query_param("project_id", "id-prj-a"))
         .and(header(AUTHORIZATION, "Token : my-token"))
         .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::pipelines_response_body()))
         .mount(&mock_upstream)
@@ -96,7 +96,7 @@ async fn get_cctray_with_legacy_path() {
     let addr = start_app(&mock_upstream.uri()).await;
 
     let res = reqwest::Client::new()
-        .get(format!("http://{}/cctray/any-org/my-project", addr))
+        .get(format!("http://{}/cctray/any-org/project-a", addr))
         .header(AUTHORIZATION, "Bearer: my-token") // replace with your path
         .send()
         .await
@@ -121,7 +121,7 @@ async fn get_cctray_head() {
 
     Mock::given(method("GET"))
         .and(path("/api/v1alpha/pipelines"))
-        .and(query_param("project_id", "my-project-id"))
+        .and(query_param("project_id", "id-prj-a"))
         .and(header(AUTHORIZATION, "Token : my-token"))
         .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::pipelines_response_body()))
         .mount(&mock_upstream)
@@ -130,7 +130,7 @@ async fn get_cctray_head() {
     let addr = start_app(&mock_upstream.uri()).await;
 
     let res = reqwest::Client::new()
-        .head(format!("http://{}/any-org/my-project/cctray", addr))
+        .head(format!("http://{}/any-org/project-a/cctray", addr))
         .header(AUTHORIZATION, "Bearer: my-token") // replace with your path
         .send()
         .await

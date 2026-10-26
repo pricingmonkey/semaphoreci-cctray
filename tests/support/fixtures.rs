@@ -4,14 +4,14 @@ pub fn projects_response_body() -> Value {
   json!([
     {
       "metadata": {
-        "name": "my-project",
-        "id": "my-project-id",
+        "name": "project-a",
+        "id": "id-prj-a",
       }
     },
     {
       "metadata": {
-        "name": "my-other-project",
-        "id": "my-other-project-id",
+        "name": "project-b",
+        "id": "id-prj-b",
       }
     },
   ])
