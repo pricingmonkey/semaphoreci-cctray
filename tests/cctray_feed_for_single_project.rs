@@ -13,7 +13,7 @@ async fn get_cctray_by_project_name() {
     Mock::given(method("GET"))
         .and(path("/api/v1alpha/projects"))
         .and(header(AUTHORIZATION, "Token : my-token"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::projects_response_body()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::projects()))
         .mount(&mock_upstream)
         .await;
 
@@ -21,7 +21,7 @@ async fn get_cctray_by_project_name() {
         .and(path("/api/v1alpha/pipelines"))
         .and(query_param("project_id", "id-prj-a"))
         .and(header(AUTHORIZATION, "Token : my-token"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::pipelines_response_body()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::pipelines_project_a()))
         .mount(&mock_upstream)
         .await;
 
@@ -47,7 +47,7 @@ async fn get_cctray_by_project_id() {
     Mock::given(method("GET"))
         .and(path("/api/v1alpha/projects"))
         .and(header(AUTHORIZATION, "Token : my-token"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::projects_response_body()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::projects()))
         .mount(&mock_upstream)
         .await;
 
@@ -55,7 +55,7 @@ async fn get_cctray_by_project_id() {
         .and(path("/api/v1alpha/pipelines"))
         .and(query_param("project_id", "id-prj-a"))
         .and(header(AUTHORIZATION, "Token : my-token"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::pipelines_response_body()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::pipelines_project_a()))
         .mount(&mock_upstream)
         .await;
 
@@ -81,7 +81,7 @@ async fn get_cctray_with_legacy_path() {
     Mock::given(method("GET"))
         .and(path("/api/v1alpha/projects"))
         .and(header(AUTHORIZATION, "Token : my-token"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::projects_response_body()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::projects()))
         .mount(&mock_upstream)
         .await;
 
@@ -89,7 +89,7 @@ async fn get_cctray_with_legacy_path() {
         .and(path("/api/v1alpha/pipelines"))
         .and(query_param("project_id", "id-prj-a"))
         .and(header(AUTHORIZATION, "Token : my-token"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::pipelines_response_body()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::pipelines_project_a()))
         .mount(&mock_upstream)
         .await;
 
@@ -115,7 +115,7 @@ async fn get_cctray_head() {
     Mock::given(method("GET"))
         .and(path("/api/v1alpha/projects"))
         .and(header(AUTHORIZATION, "Token : my-token"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::projects_response_body()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::projects()))
         .mount(&mock_upstream)
         .await;
 
@@ -123,7 +123,7 @@ async fn get_cctray_head() {
         .and(path("/api/v1alpha/pipelines"))
         .and(query_param("project_id", "id-prj-a"))
         .and(header(AUTHORIZATION, "Token : my-token"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::pipelines_response_body()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(fixtures::pipelines_project_a()))
         .mount(&mock_upstream)
         .await;
 

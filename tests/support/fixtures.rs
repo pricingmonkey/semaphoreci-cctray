@@ -1,6 +1,6 @@
 use serde_json::{json, Value};
 
-pub fn projects_response_body() -> Value {
+pub fn projects() -> Value {
   json!([
     {
       "metadata": {
@@ -17,7 +17,7 @@ pub fn projects_response_body() -> Value {
   ])
 }
 
-pub fn pipelines_response_body() -> Value {
+pub fn pipelines_project_a() -> Value {
     json!([
       {
         "name": "build",
@@ -62,6 +62,41 @@ pub fn pipelines_response_body() -> Value {
         },
         "ppl_id": "87887fa3-ced5-4b9b-aa3c-74e65003e55a",
         "wf_id": "eb86a134-3081-406a-8ca1-d6e376cf9a65"
+      }
+    ])
+}
+
+pub fn pipelines_project_b() -> Value {
+    json!([
+      {
+        "name": "deploy",
+        "state": "DONE",
+        "result": "PASSED",
+        "created_at": {
+          "seconds": 1742818065,
+          "nanos": 343587000
+        },
+        "done_at": {
+          "seconds": 1742818205,
+          "nanos": 730065000
+        },
+        "ppl_id": "56c59ffa-f88d-4946-a5d0-586c2ca8a659",
+        "wf_id": "f74afa10-1250-4e0e-bbed-c41c3435be62"
+      },
+      {
+        "name": "build",
+        "state": "DONE",
+        "result": "PASSED",
+        "created_at": {
+          "seconds": 1742817972,
+          "nanos": 836498000
+        },
+        "done_at": {
+          "seconds": 1742818063,
+          "nanos": 263184000
+        },
+        "ppl_id": "d58aa83e-6f1c-418c-9176-989ec20c2d62",
+        "wf_id": "f74afa10-1250-4e0e-bbed-c41c3435be62"
       }
     ])
 }

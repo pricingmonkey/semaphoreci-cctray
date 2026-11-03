@@ -1780,6 +1780,7 @@ dependencies = [
  "actix-web",
  "chrono",
  "env_logger",
+ "futures",
  "itertools",
  "reqwest",
  "serde",

@@ -4,6 +4,7 @@ mod semaphoreci;
 use actix_web::http::header::{ContentType, HeaderMap};
 use actix_web::web::Path;
 use actix_web::{error, route, routes, web, HttpRequest, HttpResponse, Responder};
+use futures::StreamExt;
 use serde::Deserialize;
 use std::convert::Into;
 
@@ -13,8 +14,21 @@ struct ProjectInfo {
     project: String,
 }
 
+#[derive(Deserialize)]
+struct OrgInfo {
+    org: String,
+}
+
+#[derive(Clone)]
+pub struct AppConfig {
+    pub pipelines_concurrency: usize,
+    pub pool_max_idle_per_host: usize,
+    pub base_url: Option<String>,
+}
+
 struct AppState {
     client: reqwest::Client,
+    pipelines_concurrency: usize,
     base_url: Option<String>,
 }
 
@@ -60,6 +74,60 @@ async fn cctray_project(
         .body(cctray::serialize(cctray_projects)))
 }
 
+#[routes]
+#[get("/{org}/cctray")]
+#[head("/{org}/cctray")]
+async fn cctray_org(
+    req: HttpRequest,
+    info: Path<OrgInfo>,
+    data: web::Data<AppState>,
+) -> actix_web::Result<HttpResponse> {
+    let base_url = (&data.base_url)
+        .clone()
+        .unwrap_or(format!("https://{}.semaphoreci.com", info.org));
+
+    let auth_token = get_token(req.headers()).map_err(|e| error::ErrorUnauthorized(e))?;
+
+    let projects = semaphoreci::get_projects(&base_url, &auth_token, &data.client)
+        .await
+        .map_err(to_actix_error)?;
+
+    let pipelines: Vec<semaphoreci::Pipeline> = futures::stream::iter(projects)
+        .map(|project| {
+            let base_url = base_url.clone();
+            let auth_token = auth_token.clone();
+            let client = &data.client;
+            async move {
+                semaphoreci::get_pipelines(&base_url, &project.metadata.id, &auth_token, &client)
+                    .await
+                    .map(|pipelines| {
+                        pipelines
+                            .into_iter()
+                            .map(|mut p| {
+                                p.name = format!("{} {}", project.metadata.name, p.name);
+                                p
+                            })
+                            .collect::<Vec<_>>()
+                    })
+            }
+        })
+        .buffer_unordered(data.pipelines_concurrency)
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .collect::<core::result::Result<Vec<Vec<_>>, _>>()
+        .map_err(to_actix_error)?
+        .into_iter()
+        .flatten()
+        .collect();
+
+    let cctray_projects = cctray::to_cctray_project_info(pipelines, &info.org);
+
+    Ok(HttpResponse::Ok()
+        .content_type(ContentType::xml())
+        .body(cctray::serialize(cctray_projects)))
+}
+
 fn to_actix_error(e: reqwest::Error) -> actix_web::Error {
     match e.status() {
         Some(reqwest::StatusCode::UNAUTHORIZED) => error::ErrorUnauthorized(e),
@@ -80,14 +148,15 @@ fn get_token(headers: &HeaderMap) -> Result<String, &'static str> {
         .map(|auth_token| auth_token.replace("Bearer", "").trim().into())
 }
 
-pub fn configure_app(cfg: &mut web::ServiceConfig, base_url: &Option<String>) {
-    let client = reqwest::Client::new();
+pub fn configure_app(cfg: &mut web::ServiceConfig, app_config: &AppConfig) {
+    let client = reqwest::Client::builder().pool_max_idle_per_host(app_config.pool_max_idle_per_host).build().unwrap();
 
     cfg.app_data(web::Data::new(AppState {
         client,
-        base_url: base_url.clone(),
+        pipelines_concurrency: app_config.pipelines_concurrency,
+        base_url: app_config.base_url.clone(),
     }))
     .service(hello)
-    .service(cctray_project);
+    .service(cctray_project)
+    .service(cctray_org);
 }
-
