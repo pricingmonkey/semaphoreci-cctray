@@ -44,10 +44,10 @@ async fn get_cctray_for_all_projects_in_org() {
 
     assert_eq!(res.status(), 200);
     let body = res.text().await.unwrap();
-    assert_eq!(body, "<Projects><Project name=\"project-a deploy\" activity=\"Sleeping\" lastBuildStatus=\"Failure\" lastBuildLabel=\"7ba0d874-33f0-4495-af7c-8cbccb7f56e5\" lastBuildTime=\"2025-03-28T16:48:30+00:00\" webUrl=\"https://any-org.semaphoreci.com/workflows/eb86a134-3081-406a-8ca1-d6e376cf9a65?pipeline_id=7ba0d874-33f0-4495-af7c-8cbccb7f56e5\"/>
-<Project name=\"project-a build\" activity=\"Building\" lastBuildStatus=\"Success\" lastBuildLabel=\"87887fa3-ced5-4b9b-aa3c-74e65003e55a\" lastBuildTime=\"2025-03-24T14:35:23+00:00\" webUrl=\"https://any-org.semaphoreci.com/workflows/94505eb4-27d2-4d5c-a616-27077ae9ac32?pipeline_id=0a3e10c1-f046-4959-ae9d-2677a997a72c\"/>
-<Project name=\"project-b deploy\" activity=\"Sleeping\" lastBuildStatus=\"Success\" lastBuildLabel=\"56c59ffa-f88d-4946-a5d0-586c2ca8a659\" lastBuildTime=\"2025-03-24T12:10:05+00:00\" webUrl=\"https://any-org.semaphoreci.com/workflows/f74afa10-1250-4e0e-bbed-c41c3435be62?pipeline_id=56c59ffa-f88d-4946-a5d0-586c2ca8a659\"/>
-<Project name=\"project-b build\" activity=\"Sleeping\" lastBuildStatus=\"Success\" lastBuildLabel=\"d58aa83e-6f1c-418c-9176-989ec20c2d62\" lastBuildTime=\"2025-03-24T12:07:43+00:00\" webUrl=\"https://any-org.semaphoreci.com/workflows/f74afa10-1250-4e0e-bbed-c41c3435be62?pipeline_id=d58aa83e-6f1c-418c-9176-989ec20c2d62\"/></Projects>");
+    assert_eq!(body, "<Projects><Project name=\"[project-a] deploy\" activity=\"Sleeping\" lastBuildStatus=\"Failure\" lastBuildLabel=\"7ba0d874-33f0-4495-af7c-8cbccb7f56e5\" lastBuildTime=\"2025-03-28T16:48:30+00:00\" webUrl=\"https://any-org.semaphoreci.com/workflows/eb86a134-3081-406a-8ca1-d6e376cf9a65?pipeline_id=7ba0d874-33f0-4495-af7c-8cbccb7f56e5\"/>
+<Project name=\"[project-a] build\" activity=\"Building\" lastBuildStatus=\"Success\" lastBuildLabel=\"87887fa3-ced5-4b9b-aa3c-74e65003e55a\" lastBuildTime=\"2025-03-24T14:35:23+00:00\" webUrl=\"https://any-org.semaphoreci.com/workflows/94505eb4-27d2-4d5c-a616-27077ae9ac32?pipeline_id=0a3e10c1-f046-4959-ae9d-2677a997a72c\"/>
+<Project name=\"[project-b] deploy\" activity=\"Sleeping\" lastBuildStatus=\"Success\" lastBuildLabel=\"56c59ffa-f88d-4946-a5d0-586c2ca8a659\" lastBuildTime=\"2025-03-24T12:10:05+00:00\" webUrl=\"https://any-org.semaphoreci.com/workflows/f74afa10-1250-4e0e-bbed-c41c3435be62?pipeline_id=56c59ffa-f88d-4946-a5d0-586c2ca8a659\"/>
+<Project name=\"[project-b] build\" activity=\"Sleeping\" lastBuildStatus=\"Success\" lastBuildLabel=\"d58aa83e-6f1c-418c-9176-989ec20c2d62\" lastBuildTime=\"2025-03-24T12:07:43+00:00\" webUrl=\"https://any-org.semaphoreci.com/workflows/f74afa10-1250-4e0e-bbed-c41c3435be62?pipeline_id=d58aa83e-6f1c-418c-9176-989ec20c2d62\"/></Projects>");
 }
 
 // #[actix_web::test]

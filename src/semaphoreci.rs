@@ -33,15 +33,16 @@ pub struct Pipeline {
     pub done_at: Timestamp,
     pub ppl_id: String,
     pub wf_id: String,
+    pub project_id: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct ProjectMetadata {
     pub id: String,
     pub name: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Project {
     pub metadata: ProjectMetadata,
 }

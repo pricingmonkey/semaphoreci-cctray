@@ -67,7 +67,7 @@ async fn cctray_project(
             .await
             .map_err(to_actix_error)?;
 
-    let cctray_projects = cctray::to_cctray_project_info(pipelines, &info.org);
+    let cctray_projects = cctray::to_cctray_project_info(pipelines, projects, &info.org);
 
     Ok(HttpResponse::Ok()
         .content_type(ContentType::xml())
@@ -92,7 +92,7 @@ async fn cctray_org(
         .await
         .map_err(to_actix_error)?;
 
-    let pipelines: Vec<semaphoreci::Pipeline> = futures::stream::iter(projects)
+    let pipelines: Vec<semaphoreci::Pipeline> = futures::stream::iter(projects.clone())
         .map(|project| {
             let base_url = base_url.clone();
             let auth_token = auth_token.clone();
@@ -100,15 +100,6 @@ async fn cctray_org(
             async move {
                 semaphoreci::get_pipelines(&base_url, &project.metadata.id, &auth_token, &client)
                     .await
-                    .map(|pipelines| {
-                        pipelines
-                            .into_iter()
-                            .map(|mut p| {
-                                p.name = format!("{} {}", project.metadata.name, p.name);
-                                p
-                            })
-                            .collect::<Vec<_>>()
-                    })
             }
         })
         .buffer_unordered(data.pipelines_concurrency)
@@ -121,7 +112,7 @@ async fn cctray_org(
         .flatten()
         .collect();
 
-    let cctray_projects = cctray::to_cctray_project_info(pipelines, &info.org);
+    let cctray_projects = cctray::to_cctray_project_info(pipelines, projects, &info.org);
 
     Ok(HttpResponse::Ok()
         .content_type(ContentType::xml())
@@ -149,7 +140,10 @@ fn get_token(headers: &HeaderMap) -> Result<String, &'static str> {
 }
 
 pub fn configure_app(cfg: &mut web::ServiceConfig, app_config: &AppConfig) {
-    let client = reqwest::Client::builder().pool_max_idle_per_host(app_config.pool_max_idle_per_host).build().unwrap();
+    let client = reqwest::Client::builder()
+        .pool_max_idle_per_host(app_config.pool_max_idle_per_host)
+        .build()
+        .unwrap();
 
     cfg.app_data(web::Data::new(AppState {
         client,

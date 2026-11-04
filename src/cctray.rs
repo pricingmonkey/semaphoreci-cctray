@@ -1,7 +1,8 @@
 use crate::semaphoreci;
-use crate::semaphoreci::{Pipeline, State};
+use crate::semaphoreci::{Pipeline, Project, State};
 use chrono::DateTime;
 use itertools::Itertools;
+use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
 pub enum Activity {
@@ -70,7 +71,7 @@ pub struct CCTrayProjectInfo {
 const TEMPORARY_PIPELINE_NAME: &'static str = "Pipeline";
 
 fn get_cctray_project_info(
-    name: &String,
+    project: &Project,
     pipelines: &Vec<&Pipeline>,
     org: &String,
 ) -> CCTrayProjectInfo {
@@ -111,8 +112,10 @@ fn get_cctray_project_info(
         org, latest_pipeline.wf_id, latest_pipeline.ppl_id
     );
 
+    let name = format!("[{}] {}", project.metadata.name, latest_pipeline.name);
+
     CCTrayProjectInfo {
-        name: name.clone(),
+        name,
         activity,
         last_build_status,
         last_build_label: last_build_label.to_string(),
@@ -121,14 +124,26 @@ fn get_cctray_project_info(
     }
 }
 
-pub fn to_cctray_project_info(pipelines: Vec<Pipeline>, org: &String) -> Vec<CCTrayProjectInfo> {
-    let pipelines_by_name = pipelines.iter().into_group_map_by(|p| p.name.clone());
+pub fn to_cctray_project_info(
+    pipelines: Vec<Pipeline>,
+    projects: Vec<Project>,
+    org: &String,
+) -> Vec<CCTrayProjectInfo> {
+    let projects_by_id = projects.iter().fold(HashMap::new(), |mut acc, p| {
+        acc.insert(p.metadata.id.clone(), p.clone());
+        acc
+    });
+    let pipelines_by_project_id_and_name = pipelines
+        .iter()
+        .into_group_map_by(|p| (p.project_id.clone(), p.name.clone()));
 
     Vec::from_iter(
-        pipelines_by_name
+        pipelines_by_project_id_and_name
             .iter()
-            .filter(|(name, _pipelines)| **name != String::from(TEMPORARY_PIPELINE_NAME))
-            .map(|(name, pipelines)| get_cctray_project_info(name, pipelines, org))
+            .filter(|((_, name), _pipelines)| **name != String::from(TEMPORARY_PIPELINE_NAME))
+            .map(|((project_id, _), pipelines)| {
+                get_cctray_project_info(projects_by_id.get(project_id).unwrap(), pipelines, org)
+            })
             .sorted_by_key(|i| i.last_build_time.clone())
             .rev(),
     )
@@ -152,29 +167,35 @@ mod tests {
     use crate::cctray::to_cctray_project_info;
     use crate::cctray::{Activity, BuildStatus, CCTrayProjectInfo};
     use crate::semaphoreci::Result::{FAILED, PASSED, UNKNOWN};
-    use crate::semaphoreci::{Pipeline, State, Timestamp};
+    use crate::semaphoreci::{Pipeline, Project, ProjectMetadata, State, Timestamp};
 
     #[test]
     fn convert_sem_pipelines_to_cctray_projects() {
+        let project = Project {
+            metadata: ProjectMetadata {
+                id: String::from("prj1"),
+                name: String::from("foobar"),
+            },
+        };
+
         let pipeline1 = Pipeline {
             name: String::from("foo"),
             state: State::DONE,
             result: Some(PASSED),
             ppl_id: String::from("ppl1"),
             wf_id: String::from("wf1"),
+            project_id: String::from("prj1"),
             created_at: Timestamp { seconds: 1000 },
             done_at: Timestamp { seconds: 1100 },
         };
 
-        let sem_pipelines = vec![pipeline1];
-
         let org = String::from("org-name");
-        let cctray_projects = to_cctray_project_info(sem_pipelines, &org);
+        let cctray_projects = to_cctray_project_info(vec![pipeline1], vec![project], &org);
 
         assert_eq!(
             cctray_projects,
             vec![CCTrayProjectInfo {
-                name: String::from("foo"),
+                name: String::from("[foobar] foo"),
                 activity: Activity::Sleeping,
                 last_build_status: BuildStatus::Success,
                 last_build_label: String::from("ppl1"),
@@ -188,6 +209,13 @@ mod tests {
 
     #[test]
     fn returns_one_cctray_project_when_multiple_pipelines_have_the_same_name() {
+        let sem_projects = vec![Project {
+            metadata: ProjectMetadata {
+                id: String::from("prj1"),
+                name: String::from("foobar"),
+            },
+        }];
+
         let sem_pipelines = vec![
             Pipeline {
                 name: String::from("foo"),
@@ -195,6 +223,7 @@ mod tests {
                 result: None,
                 ppl_id: String::from("ppl3"),
                 wf_id: String::from("wf2"),
+                project_id: String::from("prj1"),
                 created_at: Timestamp { seconds: 3000 },
                 done_at: Timestamp { seconds: 3100 },
             },
@@ -204,6 +233,7 @@ mod tests {
                 result: Some(PASSED),
                 ppl_id: String::from("ppl2"),
                 wf_id: String::from("wf1"),
+                project_id: String::from("prj1"),
                 created_at: Timestamp { seconds: 2000 },
                 done_at: Timestamp { seconds: 2100 },
             },
@@ -213,19 +243,20 @@ mod tests {
                 result: Some(PASSED),
                 ppl_id: String::from("ppl1"),
                 wf_id: String::from("wf1"),
+                project_id: String::from("prj1"),
                 created_at: Timestamp { seconds: 1000 },
                 done_at: Timestamp { seconds: 1100 },
             },
         ];
 
         let org = String::from("org-name");
-        let cctray_projects = to_cctray_project_info(sem_pipelines, &org);
+        let cctray_projects = to_cctray_project_info(sem_pipelines, sem_projects, &org);
 
         assert_eq!(
             cctray_projects,
             vec![
                 CCTrayProjectInfo {
-                    name: String::from("foo"),
+                    name: String::from("[foobar] foo"),
                     activity: Activity::Building,
                     last_build_status: BuildStatus::Success,
                     last_build_label: String::from("ppl2"),
@@ -235,7 +266,7 @@ mod tests {
                     ),
                 },
                 CCTrayProjectInfo {
-                    name: String::from("bar"),
+                    name: String::from("[foobar] bar"),
                     activity: Activity::Sleeping,
                     last_build_status: BuildStatus::Success,
                     last_build_label: String::from("ppl1"),
@@ -250,6 +281,13 @@ mod tests {
 
     #[test]
     fn excludes_pipelines_with_temporary_name() {
+        let sem_projects = vec![Project {
+            metadata: ProjectMetadata {
+                id: String::from("prj1"),
+                name: String::from("foobar"),
+            },
+        }];
+
         let sem_pipelines = vec![
             Pipeline {
                 name: String::from("foo"),
@@ -257,6 +295,7 @@ mod tests {
                 result: Some(PASSED),
                 ppl_id: String::from("ppl2"),
                 wf_id: String::from("wf2"),
+                project_id: String::from("prj1"),
                 created_at: Timestamp { seconds: 2000 },
                 done_at: Timestamp { seconds: 2100 },
             },
@@ -266,18 +305,19 @@ mod tests {
                 result: Some(FAILED),
                 ppl_id: String::from("ppl1"),
                 wf_id: String::from("wf1"),
+                project_id: String::from("prj1"),
                 created_at: Timestamp { seconds: 1000 },
                 done_at: Timestamp { seconds: 1100 },
             },
         ];
 
         let org = String::from("org-name");
-        let cctray_projects = to_cctray_project_info(sem_pipelines, &org);
+        let cctray_projects = to_cctray_project_info(sem_pipelines, sem_projects, &org);
 
         assert_eq!(
             cctray_projects,
             vec![CCTrayProjectInfo {
-                name: String::from("foo"),
+                name: String::from("[foobar] foo"),
                 activity: Activity::Sleeping,
                 last_build_status: BuildStatus::Success,
                 last_build_label: String::from("ppl2"),
@@ -291,6 +331,13 @@ mod tests {
 
     #[test]
     fn ignores_cancelled_pipelines() {
+        let sem_projects = vec![Project {
+            metadata: ProjectMetadata {
+                id: String::from("prj1"),
+                name: String::from("foobar"),
+            },
+        }];
+
         let sem_pipelines = vec![
             Pipeline {
                 name: String::from("build"),
@@ -298,6 +345,7 @@ mod tests {
                 result: Some(UNKNOWN(String::from("CANCELED"))),
                 ppl_id: String::from("ppl2"),
                 wf_id: String::from("wf2"),
+                project_id: String::from("prj1"),
                 created_at: Timestamp { seconds: 2000 },
                 done_at: Timestamp { seconds: 2100 },
             },
@@ -307,18 +355,19 @@ mod tests {
                 result: Some(PASSED),
                 ppl_id: String::from("ppl1"),
                 wf_id: String::from("wf1"),
+                project_id: String::from("prj1"),
                 created_at: Timestamp { seconds: 1000 },
                 done_at: Timestamp { seconds: 1100 },
             },
         ];
 
         let org = String::from("org-name");
-        let cctray_projects = to_cctray_project_info(sem_pipelines, &org);
+        let cctray_projects = to_cctray_project_info(sem_pipelines, sem_projects, &org);
 
         assert_eq!(
             cctray_projects,
             vec![CCTrayProjectInfo {
-                name: String::from("build"),
+                name: String::from("[foobar] build"),
                 activity: Activity::Sleeping,
                 last_build_status: BuildStatus::Success,
                 last_build_label: String::from("ppl1"),
