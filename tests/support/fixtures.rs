@@ -69,6 +69,7 @@ pub fn pipelines_project_a() -> Value {
     ])
 }
 
+#[allow(dead_code)]
 pub fn pipelines_project_b() -> Value {
     json!([
       {

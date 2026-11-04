@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>semaphoreci-cctray</title>
+</head>
+<body>
+
+<h1>semaphoreci-cctray</h1>
+
+<p>A <a href="https://cctray.org/">cctray</a> feed server for <a href="https://semaphoreci.com/">SemaphoreCI</a>.</p>
+
+<h2>API</h2>
+
+<ul>
+    <li><code>/{org}/cctray</code>: cctray feed for all projects in an organization</li>
+    <li><code>/{org}/{project}/cctray</code>: cctray feed for a single project</li>
+</ul>
+
+<h2>Authentication</h2>
+
+<p>You need a Semaphore API Token. You can create or regenerate your token by visiting <a
+        href="https://me.semaphoreci.com/account">your account page</a>.</p>
+
+<p>The Semaphore API Token must be sent with all requests using the HTTP <code>Authorization</code> header,
+    with this format:</p>
+
+<code>
+    Authorization: Bearer {api_token}
+</code>
+
+<p>Example with <code>curl</code>:</p>
+
+<code>
+    curl -H "Authorization: Bearer {api_token}" "http://{semaphoreci-cctray-hostname}/{org}/cctray"
+</code>
+
+
+</body>
+</html>
