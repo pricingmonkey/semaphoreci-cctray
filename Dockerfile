@@ -4,8 +4,7 @@ RUN apk --update add openssl-dev openssl-libs-static musl-dev pkgconfig
 
 WORKDIR /usr/src/semaphoreci-cctray
 
-COPY src src
-COPY Cargo.lock Cargo.toml ./
+COPY . .
 RUN cargo build --release
 RUN cargo test --release
 

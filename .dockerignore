@@ -1,0 +1,6 @@
+.github
+.idea
+debug/
+target/
+docker-compose.yml
+rust-toolchain.toml
